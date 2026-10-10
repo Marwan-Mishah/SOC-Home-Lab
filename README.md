@@ -45,6 +45,8 @@ Current enterprise systems:
   - Active Directory Domain Services
   - DNS Server
   - Domain: `soclab.local`
+  - Wazuh Agent
+  - Sysmon
 
 Planned systems:
 
@@ -53,27 +55,70 @@ Planned systems:
 - Linux server
 - Suricata NDR sensor
 - OPNsense firewall
+- Splunk environment
 
 ## Current Architecture
 
 ```text
-                          Home Network
-                               |
-                +--------------+--------------+
-                |                             |
-             Laptop                        Desktop
-          SOC / Analyst                Enterprise Lab
-                |                             |
-        SOC-WAZUH01                        DC01
-                |                             |
-      Ubuntu Server 24.04              Windows Server 2022
-                |                             |
-        +-------+-------+              +------+------+
-        |       |       |              |             |
-      Wazuh   Wazuh   Wazuh       Active Directory  DNS
-      Manager Indexer Dashboard          |
-                                         |
-                                   soclab.local
+                         Desktop PC
+                  Ryzen 5 7600 / 32 GB
+                             |
+                    VMware Workstation
+                             |
+             +---------------+---------------+
+             |                               |
+      SOC-WAZUH01                          DC01
+             |                               |
+   Ubuntu Server 24.04              Windows Server 2022
+             |                               |
+    +--------+--------+              +-------+-------+
+    |        |        |              |               |
+  Wazuh    Wazuh    Wazuh       Active Directory   DNS
+ Manager  Indexer Dashboard            |
+                                       |
+                                  soclab.local
+                                       |
+                                       |
+                                Wazuh Agent
+                                       |
+                                    Sysmon
+                                       |
+                                       +------------+
+                                                    |
+                                                    v
+                                               Wazuh SIEM
+```
+
+## Telemetry Flow
+
+```text
+Windows activity
+      |
+      v
+Windows Event Logs
+      |
+      +-------------------+
+      |                   |
+      v                   v
+Native Security Logs    Sysmon
+                          |
+                          v
+              Microsoft-Windows-Sysmon/Operational
+                          |
+                          v
+                     Wazuh Agent
+                          |
+                          v
+                    Wazuh Manager
+                          |
+                          v
+                  Detection Rules
+                          |
+                          v
+                 MITRE ATT&CK Mapping
+                          |
+                          v
+                  Wazuh Dashboard
 ```
 
 ## Documentation
@@ -93,6 +138,8 @@ Planned systems:
 - [x] Install Wazuh Dashboard
 - [x] Verify Wazuh services
 - [x] Access Wazuh dashboard from the Windows host
+- [x] Move the Wazuh VM to the desktop environment
+- [x] Verify Wazuh after migration
 
 ### Enterprise Infrastructure
 
@@ -101,7 +148,7 @@ Planned systems:
 - [x] Install Active Directory Domain Services
 - [x] Install DNS Server
 - [x] Create the `soclab.local` Active Directory forest
-- [x] Validate the domain configuration
+- [x] Validate domain configuration
 - [ ] Create Active Directory organizational units
 - [ ] Create lab users and groups
 - [ ] Deploy `WIN11-01`
@@ -109,12 +156,19 @@ Planned systems:
 
 ### Monitoring and Detection
 
-- [ ] Configure cross-device networking
-- [ ] Install Wazuh agent on `DC01`
+- [x] Verify connectivity between `DC01` and Wazuh
+- [x] Install Wazuh agent on `DC01`
+- [x] Confirm `DC01` appears as an active Wazuh endpoint
+- [x] Verify Windows telemetry reaches Wazuh
+- [x] Correct Windows Server time zone
+- [x] Install Sysmon on `DC01`
+- [x] Configure Wazuh to collect Sysmon telemetry
+- [x] Validate Sysmon Event ID 1 in Wazuh
+- [x] Confirm Wazuh detection rules process Sysmon events
+- [x] Confirm MITRE ATT&CK mappings
+- [ ] Configure advanced Windows audit policies
 - [ ] Install Wazuh agent on `WIN11-01`
-- [ ] Install Sysmon
-- [ ] Configure Windows audit policies
-- [ ] Forward Windows telemetry to Wazuh
+- [ ] Install Sysmon on `WIN11-01`
 - [ ] Deploy Suricata
 - [ ] Add Splunk
 
@@ -122,11 +176,54 @@ Planned systems:
 
 - [ ] Deploy Kali Linux
 - [ ] Configure Atomic Red Team
-- [ ] Perform controlled attack simulations
-- [ ] Build detection rules
-- [ ] Perform SOC investigations
+- [ ] Perform first controlled attack simulation
+- [ ] Build first custom detection
+- [ ] Perform first SOC investigation
+- [ ] Build incident timeline
+- [ ] Classify True Positive / False Positive
 - [ ] Map activity to MITRE ATT&CK
 - [ ] Document incident findings
+
+## Initial Detection Observations
+
+Sysmon telemetry from `DC01` is now being ingested by Wazuh.
+
+Wazuh has already generated alerts based on Sysmon process creation events.
+
+Examples observed include:
+
+- `net.exe` and `net1.exe` executing `net user`
+- PowerShell activity
+- `secedit.exe` execution
+
+Wazuh mapped these activities to MITRE ATT&CK techniques including:
+
+```text
+T1087 - Account Discovery
+T1059.001 - PowerShell
+T1070.004 - File Deletion
+```
+
+Some of these events were generated by the Wazuh agent itself while performing security assessment tasks.
+
+This demonstrates an important SOC principle:
+
+```text
+Alert != Incident
+```
+
+Alerts must be investigated in context before being classified as malicious.
+
+Important investigation context includes:
+
+- Parent process
+- User context
+- Command line
+- Process tree
+- Integrity level
+- Execution source
+- Host role
+- Expected administrative or security activity
 
 ## Planned Detection and Investigation Workflow
 
@@ -150,6 +247,7 @@ SOC Investigation
        |
        +-- Event correlation
        +-- Timeline analysis
+       +-- Process tree analysis
        +-- MITRE ATT&CK mapping
        +-- True Positive / False Positive classification
        +-- Incident documentation
@@ -159,12 +257,18 @@ SOC Investigation
 
 The lab will later be extended with:
 
+- Windows 11 domain endpoint
 - Sysmon-based endpoint telemetry
+- Advanced Windows auditing
 - Suricata network detection
+- Zeek network telemetry
 - Splunk SIEM practice
-- Velociraptor and DFIR tooling
+- Velociraptor
+- KAPE
+- Volatility
 - Sigma detection rules
-- Atomic Red Team attack simulation
+- YARA
+- Atomic Red Team
 - SOC AI assistant integration with Wazuh
 
 ## Disclaimer
