@@ -14,34 +14,25 @@ A practical Security Operations Center home lab designed to build hands-on exper
 
 ## Lab Architecture
 
-The lab is distributed across two physical systems.
+The lab currently runs primarily on the desktop system.
 
-### SOC / Analyst Side
+### Desktop System
 
-- Laptop: Intel Core i7-11800H
-- RAM: 16 GB
-- Host OS: Windows
-- Hypervisor: VMware Workstation Pro
-- SOC VM: Ubuntu Server 24.04 LTS
-- SIEM: Wazuh
-
-Current SOC components:
-
-- Wazuh Manager
-- Wazuh Indexer
-- Wazuh Dashboard
-
-### Enterprise / Attack Side
-
-- Desktop: AMD Ryzen 5 7600
+- CPU: AMD Ryzen 5 7600
 - RAM: 32 GB
 - Host OS: Windows
 - Hypervisor: VMware Workstation Pro
 
-Current enterprise systems:
+Current virtual machines:
+
+- `SOC-WAZUH01`
+  - Ubuntu Server 24.04 LTS
+  - Wazuh Manager
+  - Wazuh Indexer
+  - Wazuh Dashboard
 
 - `DC01`
-  - Windows Server 2022
+  - Windows Server 2022 Standard Evaluation
   - Active Directory Domain Services
   - DNS Server
   - Domain: `soclab.local`
@@ -50,75 +41,82 @@ Current enterprise systems:
 
 Planned systems:
 
-- `WIN11-01` Windows endpoint
-- `KALI01` attacker system
+- `WIN11-01`
+  - Windows 11 domain endpoint
+  - Wazuh Agent
+  - Sysmon
+
+- `KALI01`
+  - Controlled attack simulation
+
 - Linux server
+
 - Suricata NDR sensor
+
 - OPNsense firewall
+
 - Splunk environment
 
 ## Current Architecture
 
 ```text
-                         Desktop PC
-                  Ryzen 5 7600 / 32 GB
-                             |
-                    VMware Workstation
-                             |
-             +---------------+---------------+
-             |                               |
-      SOC-WAZUH01                          DC01
-             |                               |
-   Ubuntu Server 24.04              Windows Server 2022
-             |                               |
-    +--------+--------+              +-------+-------+
-    |        |        |              |               |
-  Wazuh    Wazuh    Wazuh       Active Directory   DNS
- Manager  Indexer Dashboard            |
-                                       |
-                                  soclab.local
-                                       |
-                                       |
-                                Wazuh Agent
-                                       |
-                                    Sysmon
-                                       |
-                                       +------------+
-                                                    |
-                                                    v
-                                               Wazuh SIEM
+                        Desktop PC
+                 Ryzen 5 7600 / 32 GB
+                            |
+                   VMware Workstation
+                            |
+             +--------------+--------------+
+             |                             |
+      SOC-WAZUH01                        DC01
+             |                             |
+   Ubuntu Server 24.04            Windows Server 2022
+             |                             |
+    +--------+--------+            +-------+-------+
+    |        |        |            |               |
+  Wazuh    Wazuh    Wazuh     Active Directory   DNS
+ Manager  Indexer Dashboard           |
+                                      |
+                                 soclab.local
+                                      |
+                                      |
+                               Wazuh Agent
+                                      |
+                                   Sysmon
+                                      |
+                                      v
+                                  Wazuh SIEM
 ```
 
 ## Telemetry Flow
 
 ```text
-Windows activity
+Windows Activity
       |
       v
 Windows Event Logs
       |
-      +-------------------+
-      |                   |
-      v                   v
-Native Security Logs    Sysmon
-                          |
-                          v
-              Microsoft-Windows-Sysmon/Operational
-                          |
-                          v
-                     Wazuh Agent
-                          |
-                          v
-                    Wazuh Manager
-                          |
-                          v
-                  Detection Rules
-                          |
-                          v
-                 MITRE ATT&CK Mapping
-                          |
-                          v
-                  Wazuh Dashboard
+      +-----------------------+
+      |                       |
+      v                       v
+Security Logs               Sysmon
+                              |
+                              v
+          Microsoft-Windows-Sysmon/Operational
+                              |
+                              v
+                         Wazuh Agent
+                              |
+                              v
+                        Wazuh Manager
+                              |
+                              v
+                       Detection Rules
+                              |
+                              v
+                    MITRE ATT&CK Mapping
+                              |
+                              v
+                       Wazuh Dashboard
 ```
 
 ## Documentation
@@ -137,8 +135,8 @@ Native Security Logs    Sysmon
 - [x] Install Wazuh Indexer
 - [x] Install Wazuh Dashboard
 - [x] Verify Wazuh services
-- [x] Access Wazuh dashboard from the Windows host
-- [x] Move the Wazuh VM to the desktop environment
+- [x] Access Wazuh dashboard
+- [x] Move Wazuh VM to desktop environment
 - [x] Verify Wazuh after migration
 
 ### Enterprise Infrastructure
@@ -147,9 +145,9 @@ Native Security Logs    Sysmon
 - [x] Rename server to `DC01`
 - [x] Install Active Directory Domain Services
 - [x] Install DNS Server
-- [x] Create the `soclab.local` Active Directory forest
-- [x] Validate domain configuration
-- [ ] Create Active Directory organizational units
+- [x] Create `soclab.local`
+- [x] Validate Active Directory
+- [ ] Create organizational units
 - [ ] Create lab users and groups
 - [ ] Deploy `WIN11-01`
 - [ ] Join `WIN11-01` to `soclab.local`
@@ -162,6 +160,7 @@ Native Security Logs    Sysmon
 - [x] Verify Windows telemetry reaches Wazuh
 - [x] Correct Windows Server time zone
 - [x] Install Sysmon on `DC01`
+- [x] Verify Sysmon Event ID 1 locally
 - [x] Configure Wazuh to collect Sysmon telemetry
 - [x] Validate Sysmon Event ID 1 in Wazuh
 - [x] Confirm Wazuh detection rules process Sysmon events
@@ -188,15 +187,16 @@ Native Security Logs    Sysmon
 
 Sysmon telemetry from `DC01` is now being ingested by Wazuh.
 
-Wazuh has already generated alerts based on Sysmon process creation events.
+Wazuh has generated alerts based on Sysmon process creation events.
 
-Examples observed include:
+Observed examples include:
 
-- `net.exe` and `net1.exe` executing `net user`
-- PowerShell activity
-- `secedit.exe` execution
+- `net.exe`
+- `net1.exe`
+- `PowerShell`
+- `secedit.exe`
 
-Wazuh mapped these activities to MITRE ATT&CK techniques including:
+Wazuh mapped observed activity to MITRE ATT&CK techniques including:
 
 ```text
 T1087 - Account Discovery
@@ -204,7 +204,7 @@ T1059.001 - PowerShell
 T1070.004 - File Deletion
 ```
 
-Some of these events were generated by the Wazuh agent itself while performing security assessment tasks.
+Some of the events were generated by the Wazuh agent itself while performing security assessment activity.
 
 This demonstrates an important SOC principle:
 
@@ -212,7 +212,7 @@ This demonstrates an important SOC principle:
 Alert != Incident
 ```
 
-Alerts must be investigated in context before being classified as malicious.
+An alert must be investigated in context before being classified as malicious.
 
 Important investigation context includes:
 
@@ -258,7 +258,6 @@ SOC Investigation
 The lab will later be extended with:
 
 - Windows 11 domain endpoint
-- Sysmon-based endpoint telemetry
 - Advanced Windows auditing
 - Suricata network detection
 - Zeek network telemetry
